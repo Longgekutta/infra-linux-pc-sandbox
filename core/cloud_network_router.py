@@ -108,7 +108,8 @@ class LinuxCloudNetworkRouter:
                 for ans in answers:
                     if ans.get("type") == 1:  # Type A (IPv4)
                         return ans.get("data")
-        except Exception:
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
+            sys.stderr.write(f"[DoH] Query warning for {domain}: {e}\n")
             return None
         return None
 

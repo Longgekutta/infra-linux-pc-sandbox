@@ -10,8 +10,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY_DEPTH=24 \
     CDP_PORT=9222
 
-# 1. Install Chromium, Xvfb, Mesa utilities, and diverse desktop fonts
+# 1. Install Chromium, Xvfb, Mesa utilities, tini init process, and diverse desktop fonts
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    tini \
     chromium \
     xvfb \
     x11-utils \
@@ -40,5 +41,6 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 9222
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
 CMD ["python3", "-m", "cli", "worker", "--port", "9222"]
+

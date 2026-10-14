@@ -16,9 +16,12 @@ import base64
 import hashlib
 import urllib.request
 import urllib.parse
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 from bridge.shared_schema import PCBrowserProfile
 from core.stealth_profile import LinuxStealthProfileGenerator
+
+logger = logging.getLogger("HeadlessDriver")
 
 class LightweightWebSocketClient:
     """
@@ -134,8 +137,8 @@ class LightweightWebSocketClient:
         if self.sock:
             try:
                 self.sock.close()
-            except Exception:
-                pass
+            except OSError as e:
+                logger.debug("Error closing socket: %s", e)
             self.sock = None
 
 
@@ -158,7 +161,8 @@ class LinuxHeadlessDriver:
             with urllib.request.urlopen(url, timeout=2.0) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return "webSocketDebuggerUrl" in data
-        except Exception:
+        except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+            logger.debug("CDP port %s not connected: %s", self.cdp_port, e)
             return False
 
     def get_pages(self) -> List[Dict[str, Any]]:
@@ -167,7 +171,8 @@ class LinuxHeadlessDriver:
             url = f"http://127.0.0.1:{self.cdp_port}/json/list"
             with urllib.request.urlopen(url, timeout=2.0) as resp:
                 return json.loads(resp.read().decode("utf-8"))
-        except Exception:
+        except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+            logger.debug("Failed to list CDP pages: %s", e)
             return []
 
     def get_stealth_script(self) -> str:
@@ -184,7 +189,8 @@ class LinuxHeadlessDriver:
                 with urllib.request.urlopen(new_url, timeout=2.0) as resp:
                     page = json.loads(resp.read().decode("utf-8"))
                     pages = [page]
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to create new CDP page: %s", e)
                 return False
 
         target = pages[min(page_index, len(pages) - 1)]
@@ -197,7 +203,8 @@ class LinuxHeadlessDriver:
                 self.ws_client.close()
             self.ws_client = LightweightWebSocketClient(ws_url, timeout=8.0)
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to connect WebSocket client: %s", e)
             return False
 
     def call_cdp(self, method: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -249,6 +256,62 @@ class LinuxHeadlessDriver:
             return res["result"]["result"].get("value")
         return None
 
+    def evaluate_in_isolated_world(self, expression: str, world_name: str = "linux_isolated_world") -> Dict[str, Any]:
+        """
+        Execute JavaScript within an isolated execution world (Page.createIsolatedWorld).
+        Prevents WAFs and anti-bot systems from observing CDP evaluations or prototype changes.
+        """
+        frame_tree = self.call_cdp("Page.getFrameTree")
+        frame_id = None
+        if isinstance(frame_tree, dict):
+            res_obj = frame_tree.get("result")
+            if isinstance(res_obj, dict):
+                ft_obj = res_obj.get("frameTree")
+                if isinstance(ft_obj, dict):
+                    f_obj = ft_obj.get("frame")
+                    if isinstance(f_obj, dict):
+                        frame_id = f_obj.get("id")
+
+        if not frame_id:
+            return self.call_cdp("Runtime.evaluate", {"expression": expression, "returnByValue": True})
+
+        world_res = self.call_cdp("Page.createIsolatedWorld", {
+            "frameId": frame_id,
+            "worldName": world_name,
+            "grantUniveralAccess": True
+        })
+
+        context_id = None
+        if isinstance(world_res, dict):
+            w_res = world_res.get("result")
+            if isinstance(w_res, dict):
+                context_id = w_res.get("executionContextId")
+
+        if not context_id:
+            return self.call_cdp("Runtime.evaluate", {"expression": expression, "returnByValue": True})
+
+        return self.call_cdp("Runtime.evaluate", {
+            "expression": expression,
+            "contextId": context_id,
+            "returnByValue": True
+        })
+
+    def get_cookies(self) -> List[Dict[str, Any]]:
+        """Extract decrypted cookies from running browser session via Network.getCookies."""
+        res = self.call_cdp("Network.getCookies")
+        if "result" in res and "cookies" in res["result"]:
+            return res["result"]["cookies"]
+        elif "cookies" in res:
+            return res["cookies"]
+        return []
+
+    def set_cookies(self, cookies: List[Dict[str, Any]]) -> bool:
+        """Inject cookies into running browser session via Network.setCookies."""
+        if not cookies:
+            return True
+        res = self.call_cdp("Network.setCookies", {"cookies": cookies})
+        return "error" not in res
+
     def capture_screenshot(self, output_file: str) -> bool:
         """Capture viewport screenshot and save as PNG file."""
         res = self.call_cdp("Page.captureScreenshot", {"format": "png"})
@@ -265,3 +328,4 @@ class LinuxHeadlessDriver:
         if self.ws_client:
             self.ws_client.close()
             self.ws_client = None
+

@@ -5,7 +5,7 @@ services:
   worker-01:
     build:
       context: ..
-      dockerFile: deploy/Dockerfile
+      dockerfile: deploy/Dockerfile
     container_name: linux_sandbox_worker_01
     restart: unless-stopped
     shm_size: '2gb'

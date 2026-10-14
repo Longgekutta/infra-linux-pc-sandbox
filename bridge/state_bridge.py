@@ -9,8 +9,11 @@ import os
 import sys
 import json
 import shutil
+import logging
 from typing import Dict, Any, List, Optional
 from bridge.shared_schema import PCBrowserProfile
+
+logger = logging.getLogger("StateBridge")
 
 class _HybridBridgeMethod:
     """Descriptor that enables methods to be called both as instance and class methods."""
@@ -58,15 +61,23 @@ class StateBridge:
 
         cfg_path = os.path.join(p_dir, "profile.json")
         profile_data = {}
-        if os.path.isfile(cfg_path):
+        try:
             with open(cfg_path, "r", encoding="utf-8") as f:
                 profile_data = json.load(f)
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            logger.warning("Failed to parse %s: %s", cfg_path, e)
 
         session_state_path = os.path.join(p_dir, "session_state.json")
         session_data = {}
-        if os.path.isfile(session_state_path):
+        try:
             with open(session_state_path, "r", encoding="utf-8") as f:
                 session_data = json.load(f)
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            logger.warning("Failed to parse %s: %s", session_state_path, e)
 
         default_dir = os.path.join(p_dir, "Default")
         cookies_db = os.path.join(default_dir, "Network", "Cookies") if os.path.exists(os.path.join(default_dir, "Network", "Cookies")) else os.path.join(default_dir, "Cookies")
@@ -133,12 +144,57 @@ class StateBridge:
             shutil.unpack_archive(bundle_path, dest_dir, "zip")
 
             cfg_path = os.path.join(dest_dir, "profile.json")
-            if os.path.isfile(cfg_path):
+            try:
                 with open(cfg_path, "r", encoding="utf-8") as f:
                     profile = PCBrowserProfile.from_dict(json.load(f))
                     profile.profile_id = target_id
                     return profile
-
-            raise ValueError("ZIP archive did not contain a valid profile.json")
+            except FileNotFoundError:
+                raise ValueError("ZIP archive did not contain a valid profile.json")
+            except Exception as e:
+                logger.warning("Failed to parse %s: %s", cfg_path, e)
+                raise ValueError(f"Corrupt profile.json in archive: {e}")
 
         raise ValueError("Invalid bundle format (must be .json or .zip)")
+
+    @_HybridBridgeMethod
+    def export_session_via_cdp(self, cdp_client: Any) -> Dict[str, Any]:
+        """
+        Extract cookies and storage state directly from active Chromium process via CDP.
+        Immune to Chrome 127+ Windows App-Bound Encryption (ABE) because cookies are retrieved
+        from decrypted memory structures.
+        """
+        result = {"cookies": [], "origins": []}
+        try:
+            if hasattr(cdp_client, "get_cookies"):
+                result["cookies"] = cdp_client.get_cookies()
+            else:
+                res = cdp_client.call_cdp("Network.getCookies")
+                if "result" in res and "cookies" in res["result"]:
+                    result["cookies"] = res["result"]["cookies"]
+                elif "cookies" in res:
+                    result["cookies"] = res["cookies"]
+        except Exception as e:
+            logger.debug("Failed to export cookies via CDP: %s", e)
+        return result
+
+    @_HybridBridgeMethod
+    def import_session_via_cdp(self, cdp_client: Any, session_data: Dict[str, Any]) -> int:
+        """
+        Inject cookies directly into active Chromium instance via CDP Network.setCookies.
+        """
+        cookies = session_data.get("cookies", [])
+        if not cookies:
+            return 0
+        try:
+            if hasattr(cdp_client, "set_cookies"):
+                success = cdp_client.set_cookies(cookies)
+                return len(cookies) if success else 0
+            else:
+                res = cdp_client.call_cdp("Network.setCookies", {"cookies": cookies})
+                if "result" in res or "error" not in res:
+                    return len(cookies)
+        except Exception as e:
+            logger.debug("Failed to import cookies via CDP: %s", e)
+        return 0
+

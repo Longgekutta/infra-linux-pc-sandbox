@@ -36,13 +36,15 @@ class LinuxContainerOrchestrator:
 
     @staticmethod
     def get_free_port(start_port: int = 9222) -> int:
-        """Find an available TCP port for remote debugging."""
+        """Find an available TCP port for remote debugging by verifying atomic bindability."""
         port = start_port
         while port < 60000:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                if s.connect_ex(("127.0.0.1", port)) != 0:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(("127.0.0.1", port))
                     return port
-            port += 1
+            except OSError:
+                port += 1
         return 9222
 
     def build_docker_run_command(
