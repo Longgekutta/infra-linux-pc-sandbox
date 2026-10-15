@@ -88,7 +88,7 @@ Guarantees consistent text metrics on HTML5 Canvas and offscreen rendering conte
 
 ### 2. Installation
 ```bash
-git clone https://github.com/Longgekutta/linux-pc-sandbox.git
+git clone https://github.com/Longgekutta/infra-linux-pc-sandbox.git
 cd linux-pc-sandbox
 pip install -r requirements.txt
 ```
