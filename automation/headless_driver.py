@@ -10,6 +10,7 @@ import os
 import sys
 import json
 import time
+import random
 import socket
 import struct
 import base64
@@ -50,13 +51,24 @@ class LightweightWebSocketClient:
         raw_key = os.urandom(16)
         sec_key = base64.b64encode(raw_key).decode("ascii")
 
+        # Browser-grade handshake headers: anti-bot systems fingerprint the WebSocket
+        # handshake (Origin / UA / header set), and minimal handshakes are a bot tell
+        # (WebSocket bot detection: handshake fingerprinting). Chrome CDP connections
+        # to localhost do not send Origin, but a Chrome-consistent UA and the full
+        # standard header set keep the upgrade indistinguishable from a
+        # browser-initiated one to any middlebox inspecting the handshake.
         handshake = (
             f"GET {path} HTTP/1.1\r\n"
             f"Host: {host}:{port}\r\n"
             f"Upgrade: websocket\r\n"
             f"Connection: Upgrade\r\n"
+            f"Pragma: no-cache\r\n"
+            f"Cache-Control: no-cache\r\n"
+            f"User-Agent: {self.profile.user_agent}\r\n"
             f"Sec-WebSocket-Key: {sec_key}\r\n"
-            f"Sec-WebSocket-Version: 13\r\n\r\n"
+            f"Sec-WebSocket-Version: 13\r\n"
+            f"Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits\r\n"
+            f"\r\n"
         )
         self.sock.sendall(handshake.encode("utf-8"))
 
@@ -223,6 +235,9 @@ class LinuxHeadlessDriver:
         }
 
         try:
+            # Human-like inter-command jitter (see windows-pc-sandbox stealth_cdp):
+            # keeps the CDP command stream timing distribution human-paced.
+            time.sleep(random.uniform(0.002, 0.012))
             self.ws_client.send_json(payload)
             # Loop until response with matching ID is received (ignore asynchronous events)
             start_t = time.time()
