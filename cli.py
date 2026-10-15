@@ -75,16 +75,17 @@ def main():
 
     if args.command == "list":
         profiles = []
-        if os.path.exists(base_dir):
-            for d in os.listdir(base_dir):
-                cfg_path = os.path.join(base_dir, d, "profile.json")
-                if os.path.isfile(cfg_path):
-                    try:
-                        with open(cfg_path, "r", encoding="utf-8") as f:
-                            p = PCBrowserProfile.from_dict(json.load(f))
-                            profiles.append(p)
-                    except Exception:
-                        pass
+        for d in os.listdir(base_dir):
+            cfg_path = os.path.join(base_dir, d, "profile.json")
+            try:
+                # EAFP: open directly instead of an exists/isfile probe (TOCTOU, CWE-367)
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    p = PCBrowserProfile.from_dict(json.load(f))
+                    profiles.append(p)
+            except FileNotFoundError:
+                continue  # directory without profile.json: not a profile, skip
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                print(f"[!] Skipping corrupt profile config {cfg_path}: {e}", file=sys.stderr)
 
         print(f"\n[Linux-PC-Sandbox] Found {len(profiles)} registered profiles:")
         print(f"{'Profile ID':<20} {'Platform':<10} {'GPU Renderer':<45} {'Proxy':<20}")
