@@ -14,6 +14,7 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, Optional, Tuple
 from bridge.shared_schema import ProxyConfig
+from core.tls_impersonation import build_ssl_context
 
 class LinuxCloudNetworkRouter:
     """
@@ -69,7 +70,7 @@ class LinuxCloudNetworkRouter:
                 headers={"User-Agent": "Linux-PC-Sandbox/1.0"}
             )
             # Create a context that verifies certificates
-            ctx = ssl.create_default_context()
+            ctx = build_ssl_context()
             with opener.open(req, timeout=timeout, context=ctx) as resp:
                 latency = (time.time() - start_time) * 1000.0
                 data = json.loads(resp.read().decode("utf-8"))
@@ -101,7 +102,7 @@ class LinuxCloudNetworkRouter:
                     "User-Agent": "Linux-PC-Sandbox-DoH/1.0"
                 }
             )
-            ctx = ssl.create_default_context()
+            ctx = build_ssl_context()
             with opener.open(req, timeout=timeout, context=ctx) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 answers = data.get("Answer", [])
