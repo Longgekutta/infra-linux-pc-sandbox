@@ -52,8 +52,11 @@ class _MockWSHandler(threading.Thread):
 class TestLightweightWebSocketClient(unittest.TestCase):
 
     def test_handshake_and_echo(self):
-        import random
-        port = random.randint(20000, 40000)
+        # Deterministic free port (no randint — PRB-E401 reproducibility)
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
         handler = _MockWSHandler(port)
         handler.start()
         try:
