@@ -30,9 +30,10 @@ class LightweightWebSocketClient:
     Zero external dependencies, ideal for minimalist Linux container environments.
     """
 
-    def __init__(self, ws_url: str, timeout: float = 10.0):
+    def __init__(self, ws_url: str, timeout: float = 10.0, profile=None):
         self.ws_url = ws_url
         self.timeout = timeout
+        self.profile = profile
         self.sock: Optional[socket.socket] = None
         self._msg_id = 0
         self._connect()
@@ -64,7 +65,7 @@ class LightweightWebSocketClient:
             f"Connection: Upgrade\r\n"
             f"Pragma: no-cache\r\n"
             f"Cache-Control: no-cache\r\n"
-            f"User-Agent: {self.profile.user_agent}\r\n"
+            f"User-Agent: {self.profile.user_agent if self.profile else 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'}\r\n"
             f"Sec-WebSocket-Key: {sec_key}\r\n"
             f"Sec-WebSocket-Version: 13\r\n"
             f"Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits\r\n"
