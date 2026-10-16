@@ -20,6 +20,8 @@ from bridge.state_bridge import StateBridge
 from core.stealth_profile import LinuxStealthProfileGenerator
 from core.container_orchestrator import LinuxContainerOrchestrator
 from core.cloud_network_router import LinuxCloudNetworkRouter
+from core.consistency_audit import audit_profile_coherence
+from core.leak_selftest import run_leak_selftest
 from automation.headless_driver import LinuxHeadlessDriver
 from automation.task_worker import LinuxTaskWorker
 
@@ -42,6 +44,13 @@ def main():
     print(f"  - Cloaked GPU: {profile.gpu.gl_renderer}")
     print(f"  - Concurrency: {profile.hardware_concurrency} Cores | Memory: {profile.device_memory_gb} GB")
     print(f"  - Timezone: {profile.timezone}")
+
+    # 1b. Cross-layer coherence audit (catches configuration contradictions)
+    print("\n[Step 1b] Cross-layer fingerprint coherence audit...")
+    coherence = audit_profile_coherence(profile, egress_country="US")
+    print(f"  - Coherence score: {coherence['score']}/100 | coherent: {coherence['coherent']}")
+    for issue in coherence["issues"]:
+        print(f"  - ⚠️ {issue}")
 
     # 2. Container Orchestration & cgroup v2 Limits
     print("\n[Step 2] Building Containerized Execution Plan (cgroup v2 quotas)...")
