@@ -102,25 +102,36 @@ class LinuxTaskWorker:
     def warm_up_session(
         self,
         urls: Optional[List[str]] = None,
-        duration_per_url: float = 3.0
+        duration_per_url: float = 3.0,
+        session_pacing: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Visit warm-up targets, scroll pages naturally, and generate organic browsing context.
+
+        session_pacing=True (default) adds human-like inter-page pauses drawn from
+        a log-uniform distribution — automated sessions visit pages at
+        machine-stable intervals, and connection-lifecycle analysis flags the
+        uniformity itself.真人会话的页间停留呈重尾分布，不是均匀间隔。
         """
         targets = urls or self.WARMUP_TARGETS
         results = []
 
         self.driver.inject_stealth()
 
-        for target in targets:
+        for i, target in enumerate(targets):
+            if session_pacing and i > 0:
+                # Log-uniform pause: mostly short, occasionally long (a human
+                # reading a page). Range 0.5-8s, median ~2s.
+                time.sleep(random.uniform(0.5, 2.0) ** 2 / 2.0)
             start_t = time.time()
             ok = self.driver.navigate(target, wait_seconds=duration_per_url)
 
-            # Simulate natural scroll
+            # Simulate natural scroll with a small dwell
             if ok:
                 scroll_script = f"window.scrollTo(0, {random.randint(200, 800)});"
                 self.driver.evaluate(scroll_script)
-                time.sleep(1.0)
+                # Reading dwell: page-length dependent, log-uniform 0.4-1.6s
+                time.sleep(random.uniform(0.4, 1.6))
 
             elapsed = round(time.time() - start_t, 2)
             results.append({
