@@ -107,6 +107,35 @@ python -m unittest discover tests
 
 ## 💻 CLI Command Reference
 
+## 🔬 Cross-Layer Consistency & Leak Self-Test (V2 additions)
+
+Two self-audit modules guard the stealth layer against regressions:
+
+- **`core/consistency_audit.py`** — cross-layer fingerprint coherence auditor.
+  Detection engines score contradictions BETWEEN signals, not signals in
+  isolation. This module catches egress-country/timezone/locale mismatches,
+  UA-vs-platform contradictions, proxy/WebRTC conflicts, and portrait-screen
+  entropy before task launch (exit code 0 = coherent, 1 = flagged).
+
+- **`core/leak_selftest.py`** — CDP leak self-verifier. Runs page-side probes
+  for the two industry-standard CDP leak vectors (console.debug error.stack
+  getter probe, prototype-chain Proxy ownKeys probe) plus webdriver/plugins
+  checks. Fail-closed: a probe evaluation failure counts as a leak.
+
+```bash
+python cli.py consistency worker_us_01 --egress-country US
+```
+
+## 🚇 Native TLS Daemon (Go, optional)
+
+`tls_daemon/` ships a bogdanfinn/tls-client (Chrome_133 profile) NDJSON-stdio
+daemon. `core/tls_rewrite.py` routes browser requests through it via CDP
+`Fetch.enable` when the binary is built and on PATH:
+
+```bash
+cd tls_daemon && go mod tidy && go build -o tls-daemon-bin .
+```
+
 The unified CLI provides full orchestration over profiles, containers, and maintenance cycles:
 
 ```bash
