@@ -176,7 +176,7 @@ class TLSRewriteDriver:
         return {"action": "fulfilled"}
 
     def _daemon_fetch(self, url: str, method: str,
-                      headers: Dict[str, str], body: Optional[str]) -> Dict[str, Any]:
+                      headers: Dict[str, str], body: Optional[str] = None) -> Dict[str, Any]:
         """Execute one upstream request via the native TLS daemon (NDJSON stdio
         or CLI form, per the daemon's interface)."""
         job = {"method": method, "url": url, "headers": headers}
