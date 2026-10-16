@@ -59,6 +59,11 @@ def main():
     audit_p = subparsers.add_parser("audit", help="Audit CDP endpoint stealth and Mesa cloaking")
     audit_p.add_argument("--port", type=int, default=9222, help="CDP port to audit")
 
+    # consistency
+    cons_p = subparsers.add_parser("consistency", help="Cross-layer fingerprint coherence audit for a profile")
+    cons_p.add_argument("profile_id", help="Profile ID to audit")
+    cons_p.add_argument("--egress-country", default="", help="Egress country code from a prior egress check (e.g. US)")
+
     # import
     import_p = subparsers.add_parser("import", help="Import session bundle from Windows sandbox")
     import_p.add_argument("bundle_path", help="Path to profile bundle .json")
@@ -183,6 +188,19 @@ def main():
         bridge = StateBridge(base_profile_dir=base_dir)
         out = bridge.export_profile_bundle(args.profile_id, args.output_path)
         print(f"[Linux-PC-Sandbox] Exported profile '{args.profile_id}' to: {out}")
+
+    elif args.command == "consistency":
+        from core.consistency_audit import audit_profile_coherence
+        cfg_file = os.path.join(orchestrator.get_profile_data_dir(args.profile_id), "profile.json")
+        try:
+            with open(cfg_file, "r", encoding="utf-8") as f:
+                profile = PCBrowserProfile.from_dict(json.load(f))
+        except FileNotFoundError:
+            print(f"Error: Profile '{args.profile_id}' not found.")
+            sys.exit(1)
+        r = audit_profile_coherence(profile, egress_country=args.egress_country or None)
+        print(json.dumps(r, indent=2))
+        sys.exit(0 if r["coherent"] else 1)
 
     else:
         parser.print_help()
