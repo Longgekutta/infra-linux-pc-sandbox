@@ -13,6 +13,13 @@ import subprocess
 from typing import Dict, Any, List, Optional, Tuple
 from bridge.shared_schema import PCBrowserProfile
 
+def _shared_disable_features() -> str:
+    """Chromium disable-features list from the shared knowledge base."""
+    from core.knowledge_sync import load_shared
+    return load_shared().get("chromium_disable_features",
+                             "Translate,OptimizationHints,AudioServiceSandbox")
+
+
 class LinuxContainerOrchestrator:
     """
     Orchestrates the lifecycle of scalable Linux desktop browser sandboxes.
@@ -95,6 +102,9 @@ class LinuxContainerOrchestrator:
         data_dir = self.get_profile_data_dir(profile.profile_id)
         os.makedirs(data_dir, exist_ok=True)
 
+        # Chromium automation switches from the shared knowledge base
+        # (patchright-derived: which stock automation switches are tells).
+        from core.knowledge_sync import automation_switches_to_remove
         args = [
             "chromium",
             f"--user-data-dir={data_dir}",
@@ -102,17 +112,22 @@ class LinuxContainerOrchestrator:
             "--headless=new",
             "--no-sandbox",
             "--disable-dev-shm-usage",
-            "--disable-gpu",
             "--disable-blink-features=AutomationControlled",
-            "--disable-features=AudioServiceSandbox,Translate,OptimizationHints",
             "--force-color-profile=srgb",
             "--no-first-run",
             "--no-default-browser-check",
             f"--window-size={profile.screen.width},{profile.screen.height}",
             f"--webrtc-ip-handling-policy={profile.webrtc_mode}",
             f"--lang={profile.languages[0]}",
-            target
         ]
+        # patchright-derived switch list: these are the stock automation switches
+        # Playwright passes by default — we build our own command, so the correct
+        # absorption is to NOT pass any of them (verify none leaked in).
+        for sw in automation_switches_to_remove():
+            if sw in args:
+                args.remove(sw)
+        args.append("--disable-features=" + _shared_disable_features())
+        args.append(target)
 
         if profile.proxy.enabled:
             proxy_arg = profile.proxy.to_chrome_arg()
