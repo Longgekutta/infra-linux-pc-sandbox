@@ -212,3 +212,26 @@ MIT License. Designed and engineered for high-concurrency browser automation and
 ```bash
 python -c "from core.upstream_watcher import run_watch; run_watch()"
 ```
+
+
+## 🦊 Dual-Kernel Formation (V4: Gecko + Blink)
+
+`automation/camoufox_driver.py` adds **Camoufox (Gecko kernel)** as the fourth
+fleet driver — the only practical path out of the Blink kernel:
+
+- Camoufox = Firefox fork with **engine-level** anti-fingerprinting (C++ source),
+  driven over Juggler — CDP `Runtime.enable` leaks structurally cannot exist.
+- Fleet strategy: routine targets ride the Blink drivers (CDP ecosystem),
+  high-adversarial targets switch to the Gecko driver. Same IP, different
+  fingerprint lineage — the anti-bot sees two entirely different "people".
+
+Setup (one-time, on your machine — the 700MB Gecko binary):
+
+```bash
+pip install camoufox
+python -m camoufox fetch
+```
+
+The driver reports `package_available` and `binary_installed` as separate
+dimensions and fails loudly when the binary is missing — never silently
+falling back to Blink pretending to be Gecko.
