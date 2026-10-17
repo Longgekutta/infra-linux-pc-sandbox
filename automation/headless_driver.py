@@ -262,7 +262,29 @@ class LinuxHeadlessDriver:
         time.sleep(wait_seconds)
         return "result" in res
 
-    def evaluate(self, expression: str) -> Any:
+    def evaluate(self, expression: str, force_isolated: Optional[bool] = None) -> Any:
+        """Evaluate JS. Shared knowledge controls the Runtime-leak fix mode:
+        'alwaysIsolated' (rebrowser) routes every evaluation through an isolated
+        world, avoiding main-world Runtime.evaluate exposure. The expression is
+        tagged with a generic sourceURL (rebrowser: library-specific
+        //# sourceURL=pptr:... markers are a fingerprint)."""
+        if force_isolated is None:
+            try:
+                from core.knowledge_sync import cdp_runtime_fix_mode
+                force_isolated = cdp_runtime_fix_mode() == "alwaysIsolated"
+            except Exception:
+                force_isolated = False
+        try:
+            from core.knowledge_sync import sourceURL_name
+            expression = f"{expression}\n//# sourceURL={sourceURL_name()}"
+        except Exception as e:
+            import logging
+            logging.getLogger("LinuxHeadlessDriver").debug(
+                "sourceURL tag skipped: %s", e)
+        if force_isolated:
+            res = self.evaluate_in_isolated_world(expression)
+            if isinstance(res, dict) and "result" in res:
+                return res["result"]
         """Evaluate a JavaScript expression in the current page context."""
         res = self.call_cdp("Runtime.evaluate", {
             "expression": expression,
@@ -272,7 +294,12 @@ class LinuxHeadlessDriver:
             return res["result"]["result"].get("value")
         return None
 
-    def evaluate_in_isolated_world(self, expression: str, world_name: str = "linux_isolated_world") -> Dict[str, Any]:
+    def evaluate_in_isolated_world(self, expression: str, world_name: str = "", **_kw) -> Dict[str, Any]:
+        # Generic world name from shared knowledge (a library-specific world name
+        # like "linux_isolated_world" is itself a fingerprint).
+        if not world_name:
+            from core.knowledge_sync import utility_world_name
+            world_name = utility_world_name()
         """
         Execute JavaScript within an isolated execution world (Page.createIsolatedWorld).
         Prevents WAFs and anti-bot systems from observing CDP evaluations or prototype changes.
@@ -280,13 +307,10 @@ class LinuxHeadlessDriver:
         frame_tree = self.call_cdp("Page.getFrameTree")
         frame_id = None
         if isinstance(frame_tree, dict):
-            res_obj = frame_tree.get("result")
-            if isinstance(res_obj, dict):
-                ft_obj = res_obj.get("frameTree")
-                if isinstance(ft_obj, dict):
-                    f_obj = ft_obj.get("frame")
-                    if isinstance(f_obj, dict):
-                        frame_id = f_obj.get("id")
+            res_obj = frame_tree.get("result") or {}
+            ft_obj = res_obj.get("frameTree") or {}
+            f_obj = ft_obj.get("frame") or {}
+            frame_id = f_obj.get("id")
 
         if not frame_id:
             return self.call_cdp("Runtime.evaluate", {"expression": expression, "returnByValue": True})
@@ -299,9 +323,8 @@ class LinuxHeadlessDriver:
 
         context_id = None
         if isinstance(world_res, dict):
-            w_res = world_res.get("result")
-            if isinstance(w_res, dict):
-                context_id = w_res.get("executionContextId")
+            w_res = world_res.get("result") or {}
+            context_id = w_res.get("executionContextId")
 
         if not context_id:
             return self.call_cdp("Runtime.evaluate", {"expression": expression, "returnByValue": True})
