@@ -1,0 +1,82 @@
+{
+  "_说明": "三端共享对抗知识库（单一数据源，knowledge_sync.py 分发到三端）。来源: patchright chromiumSwitches 清单 / rebrowser-patches Runtime.enable 修复模式 / tls-client Chrome profile 表 / osm0sis PIFork autopif4 思路。更新方式: upstream_watcher.py 定期 diff 上游 release/commit 自动吸收。",
+  "_version": 1,
+  "_updated": "2026-10-17",
+  "chromium_automation_switches_to_remove": [
+    "--enable-automation",
+    "--disable-popup-blocking",
+    "--disable-component-update",
+    "--disable-default-apps",
+    "--disable-extensions",
+    "--disable-client-side-phishing-detection",
+    "--disable-component-extensions-with-background-pages",
+    "--allow-pre-commit-input",
+    "--disable-ipc-flooding-protection",
+    "--metrics-recording-only",
+    "--unsafely-disable-devtools-self-xss-warnings",
+    "--disable-back-forward-cache",
+    "--enable-unsafe-swiftshader"
+  ],
+  "chromium_disable_features": "ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker",
+  "cdp_runtime_leak_fix_modes": {
+    "addBinding": "在主世界创建 binding，调用后保存其 context ID（rebrowser 默认）",
+    "alwaysIsolated": "所有脚本一律在 isolated context 执行",
+    "enableDisable": "调用 Runtime.Enable 后立即 Runtime.Disable（PIFork 风格）"
+  },
+  "sourceURL_spoof": "page.evaluate 脚本的 //# sourceURL= 统一改为通用名 app.js（杜绝 pptr:/puppeteer: 指纹）",
+  "utility_world_name": "isolated_world",
+  "tls_chrome_profiles_available": [
+    "Chrome_103",
+    "Chrome_104",
+    "Chrome_105",
+    "Chrome_106",
+    "Chrome_107",
+    "Chrome_108",
+    "Chrome_109",
+    "Chrome_110",
+    "Chrome_111",
+    "Chrome_112",
+    "Chrome_116",
+    "Chrome_117",
+    "Chrome_120",
+    "Chrome_124",
+    "Chrome_133",
+    "Chrome_144",
+    "Chrome_146",
+    "Chrome_150",
+    "Chrome_152"
+  ],
+  "tls_default_profile": "Chrome_133",
+  "mobile_pif_ecosystem": {
+    "deepest_project": "osm0sis/PlayIntegrityFork (4.6k★, 2026-10-16 活跃)",
+    "key_insight": "公开 fingerprint 会被 Google 封禁；private fingerprint (Pixel Canary 提取) 是唯一长期路径",
+    "autopif_pattern": "定期从 Android Beta 端点抓取最新 Canary fingerprint，生成 pif.prop",
+    "supported_formats": [
+      "custom.pif.json",
+      "custom.pif.prop"
+    ]
+  },
+  "upstream_watch_targets": [
+    {
+      "repo": "Kaliiiiiiiiii-Vinyzu/patchright",
+      "watch": "driver_patches/*.ts 变更（新规避开关）"
+    },
+    {
+      "repo": "rebrowser/rebrowser-patches",
+      "watch": "README 新 patch 段落 + patches 目录"
+    },
+    {
+      "repo": "osm0sis/PlayIntegrityFork",
+      "watch": "autopif4.sh + example.pif.prop 格式变更"
+    },
+    {
+      "repo": "bogdanfinn/tls-client",
+      "watch": "profiles/*.go 新增 Chrome/FF profile"
+    },
+    {
+      "repo": "lexiforest/curl_cffi",
+      "watch": "impersonate 目标新增"
+    }
+  ],
+  "sourceURL_spoof_name": "app.js"
+}
