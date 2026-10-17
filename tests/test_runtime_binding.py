@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 import sys
 import os
+import json
 import re
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -49,8 +50,15 @@ class TestRuntimeBinding(unittest.TestCase):
     def test_probe_returns_none_when_not_armed(self):
         mock = _MockCDP()
         session = RuntimeBindingSession(mock, fix_mode="addBinding")
-        self.assertIsNone(session.probe_main_context({}),
-                          "Unarmed session must return None (caller falls back to isolated)")
+        self.assertFalse(session._binding_ready, "Unarmed session must not be marked ready")
+        result = session.probe_main_context({})
+        self.assertIsNone(result, "Unarmed session must return None (caller falls back to isolated)")
+        # Concrete: probe must NOT have sent the bootstrap evaluate when unarmed
+        methods = [c[0] for c in mock.calls]
+        bootstrap_calls = [c for c in mock.calls
+                           if c[0] == "Runtime.evaluate" and "rb_" in json.dumps(c[1] or {})]
+        self.assertEqual(bootstrap_calls, [],
+                         "Unarmed session must not send the binding bootstrap expression")
 
     def test_status_shape(self):
         mock = _MockCDP()
