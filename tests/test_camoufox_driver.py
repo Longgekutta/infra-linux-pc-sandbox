@@ -23,12 +23,13 @@ class TestCamoufoxDriver(unittest.TestCase):
         # not be fetched. The driver must report both dimensions separately.
         d = CamoufoxDriver()
         s = d.status()
-        self.assertIn("package_available", s)
-        self.assertIn("binary_installed", s)
-        self.assertIn("kernel", s)
+        self.assertIn("package_available", s, "status must report package dimension")
+        self.assertIn("binary_installed", s, "status must report binary dimension")
+        self.assertIn("kernel", s, "status must report kernel lineage")
         # Coherence: if the package is absent, availability must be False
         if not camoufox_available():
-            self.assertFalse(s["package_available"])
+            self.assertFalse(s["package_available"],
+                             "Package absent must report package_available=False")
 
     def test_launch_without_binary_fails_loudly(self):
         d = CamoufoxDriver()
