@@ -196,3 +196,19 @@ Each worker operates under strict cgroup limits (768MB RAM, 1 CPU core), allowin
 ## 📄 License
 
 MIT License. Designed and engineered for high-concurrency browser automation and anti-detect research.
+
+
+## 🔄 Three-Sandbox Knowledge Sync & Upstream Watcher (V3)
+
+- **`core/knowledge_sync.py`** — single source of truth for adversarial
+  knowledge: patchright-derived automation switch list, rebrowser Runtime.enable
+  fix modes, tls-client Chrome profile table, PIFork insights. One JSON
+  (`shared_knowledge.json`) distributed to all three tiers.
+- **`core/upstream_watcher.py`** — periodic upstream monitor (GitHub API):
+  diffs patchright/rebrowser/PIFork/tls-client releases and commits, auto-absorbs
+  parameter-list changes (new Chrome TLS profiles) into the shared knowledge,
+  flags source-patch changes for human review. Long-term self-update engine.
+
+```bash
+python -c "from core.upstream_watcher import run_watch; run_watch()"
+```
